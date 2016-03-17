@@ -1,0 +1,227 @@
+<?php
+// $Id$
+
+/**
+ * Implements hook_permission().
+ */
+function register_multiple_permission()
+{
+    $permissions = array(
+        'register multiple' => array(
+            'title' => t('Allowed to register for multiple'),
+            'description' => t('Manage multiple registeration options.'),
+        ),
+    );
+
+    return $permissions;
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function register_multiple_menu()
+{
+    $items = array();
+    $regsitration_types = registration_get_types();
+    foreach ($regsitration_types as $reg_type) {
+        $path = preg_replace('@[^a-z0-9-]+@', '-', strtolower($reg_type->label));
+        $items['register/' . $path] = array(
+            'title' => t('Register: ' . $reg_type->label),
+            'page callback' => 'reg_multi_page_callback',
+            'type' => MENU_CALLBACK,
+            'access arguments' => array('register multiple'),
+            'access callback' => 'user_access',
+            'page arguments' => array(1, $reg_type->name),
+        );
+    }
+    return $items;
+}
+
+
+/**
+ * load the related entity nodes and use the last one
+ * for entity_id or dsiplay
+ * "no nodes have registrations enabled."
+ */
+
+function reg_multi_page_callback($form, $registration_type)
+{
+    $registration_entites = get_registration_entities();
+    foreach ($registration_entites as $key => $array) {
+        // Setting $key to load a registration entity.
+        // Setting $key to load a registration entity.
+    }
+    if ($key != NULL) { // not sure what to use here...
+        // Get a form to attach the events list to.
+        $registration = entity_get_controller('registration')->create(array(
+            'entity_type' => 'node',
+            'entity_id' => $key, // Needs to be a valid node.
+            'type' => $registration_type, // nead to load the correct form here...
+            'staff_registration' => 'register_multiple',
+        ));
+
+        return drupal_get_form('registration_form', $registration);
+    } else return ('No registrations are enabled');
+}
+
+/**
+ * Implementation of hook_form_alter().
+ */
+
+
+function register_multiple_form_registration_form_alter(&$form, &$form_state, $form_id)
+{
+    if ($form['#entity']->staff_registration == 'register_multiple') {
+
+        //$form['#registration_settings']->entity_id = 18741;
+        //$form['#entity']->entity_id = 18741;
+
+// Load the related registraion entities and add them as check boxes.
+        $registration_entites = get_registration_entities();
+        $index = 0;
+        $checkbox_values = array();
+        foreach ($registration_entites as $reg_entity) {
+            $node = load_node_for_registration_entities($reg_entity);
+            $node_reg_type = $node->field_events_registration['und'][0]['registration_type'];
+            $date = $node->field_date_calendar['und'][0]['value'];
+            $type = $form_state['build_info']['args'][0]->type;
+            //$date = (date("l, jS F Y",(strtotime($date))));
+            if ($date > date("Y-m-d") && $node_reg_type == $type) {
+                $checkbox_values[$node->nid] = (date("l, jS F Y", (strtotime($date)))) . ' | ' . '<strong>' . $node->title . '</strong>';
+            }
+
+        }
+
+        $form['registration_entity'] = array(
+            '#type' => 'checkboxes',
+            '#options' => $checkbox_values,
+            '#title' => t('Check all that your registering for'),
+            '#weight' => 1000,
+        );
+
+        $form['registration_entity']['#weight'] = -100;
+        $form['#submit'][] = 'my_callback_function';
+        //return $form;
+    }
+
+}
+
+
+function my_callback_function($form, $form_state)
+{
+
+    $registration_entitys = $form_state['values']['registration_entity'];
+    $last = FALSE;
+    $numItems = count($registration_entitys);
+    foreach ($registration_entitys as $reg_entity) {
+        if(++$i === $numItems) {
+            $last = 'TRUE';
+        }
+        if ($reg_entity != 0) {
+
+            //switch the entity_id of the form and register.
+            $form['#entity']->entity_id = $reg_entity;
+            registration_form_submit_dupe($form, $form_state, $last);
+        }
+    }
+
+
+}
+
+function load_node_for_registration_entities($reg_node)
+{
+
+    $node = node_load($reg_node->entity_id);
+
+    return $node;
+
+}
+
+
+/**
+ * Load the registration module related entities that are enabled. Enabled registrations are stored in the registration_entity table. No registration types are included in the registration_entity table.
+ */
+function get_registration_entities()
+{
+
+    $results = db_select('registration_entity', 're')
+        ->fields('re')
+        ->condition('status', 1)
+        ->execute()
+        ->fetchAllAssoc('entity_id');
+
+    return $results;
+}
+
+/**
+ * DUPLICATION OF Submit callback for registration_form(). With the returend id set to NULL so the form will submit twice.
+ */
+function registration_form_submit_dupe($form, &$form_state, $last)
+{
+    $registration = $form_state['registration'];
+
+    // Set the registration's author uid:
+    if (!isset($registration->registration_id)) {
+        $registration->author_uid = $GLOBALS['user']->uid;
+    }
+    $registration->count = $form_state['values']['count'];
+
+    if (!empty($form_state['values']['state'])) {
+        $registration->state = $form_state['values']['state'];
+    }
+
+    switch ($form_state['values']['who_is_registering']) {
+        case REGISTRATION_REGISTRANT_TYPE_ANON:
+            $registration->anon_mail = trim($form_state['values']['anon_mail']);
+            break;
+
+        case REGISTRATION_REGISTRANT_TYPE_ME:
+            global $user;
+            $registration->user_uid = $user->uid;
+            break;
+
+        case REGISTRATION_REGISTRANT_TYPE_USER:
+            if ($reg_user = user_load_by_name($form_state['values']['user'])) {
+                $registration->user_uid = $reg_user->uid;
+            }
+            break;
+    }
+
+    // Notify field widgets.
+    field_attach_submit('registration', $registration, $form, $form_state);
+
+    // Save the registration and redirect.
+    if (registration_save($registration)) {
+        // Clear the registration_id so the form will submit more than once.
+        if ($last != TRUE) {
+            // try to prevent multiple multiple submits. Probably useless...
+            $registration->registration_id = NULL;
+        }
+
+        $reg_config = registration_entity_settings($registration->entity_type, $registration->entity_id);
+        if (!empty($reg_config['settings']['confirmation']) && strlen($reg_config['settings']['confirmation'])) {
+            drupal_set_message(t($reg_config['settings']['confirmation']));
+        }
+        $wrapper = entity_metadata_wrapper('registration', $registration);
+        $host = $wrapper->entity->value();
+
+        // Set redirect to configured value, if there is one.
+        if (!empty($reg_config['settings']['confirmation_redirect']) && strlen($reg_config['settings']['confirmation_redirect'])) {
+            $form_state['redirect'] = $reg_config['settings']['confirmation_redirect'];
+        } else {
+            // Redirect to registration:
+            if (entity_access('view', 'registration', $registration)) {
+                $uri = entity_uri('registration', $registration);
+                $form_state['redirect'] = $uri['path'];
+            } // Redirect to host entity:
+            else {
+                if (entity_access('view', $registration->entity_type, $host)) {
+                    $uri = entity_uri($registration->entity_type, $host);
+                    $form_state['redirect'] = $uri['path'];
+                }
+            }
+        }
+    } else {
+        drupal_set_message(t('There was a problem submitting your registration.'));
+    }
+}
