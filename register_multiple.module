@@ -91,7 +91,7 @@ function register_multiple_form_registration_form_alter(&$form, &$form_state, $f
         $form['registration_entity'] = array(
             '#type' => 'checkboxes',
             '#options' => $checkbox_values,
-            '#title' => t('Check all that your registering for'),
+            '#title' => t('Check to register.'),
             '#weight' => 1000,
         );
 

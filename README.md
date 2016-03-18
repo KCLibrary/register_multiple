@@ -12,4 +12,4 @@ If you have a date field you will need to update your machine name field.
 
 Or remove the date conditional and just use ``` $checkbox_values[$node->nid] = $node->title; ``` to display the title.
 
-You can find the url to the multiple registration page at /register/LABEL-OF-YOUR-REGISTRATION-TYPE
+You can find the url of the multiple registration page(s) at /register/LABEL-OF-YOUR-REGISTRATION-TYPE
