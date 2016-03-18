@@ -37,14 +37,13 @@ function register_multiple_menu() {
 
 /**
  * load the related entity nodes and use the last one
- * for entity_id or dsiplay
+ * for entity_id or display
  * "no nodes have registrations enabled."
  */
 
 function reg_multi_page_callback($form, $registration_type) {
     $registration_entites = get_registration_entities();
     foreach ($registration_entites as $key => $array) {
-        // Setting $key to load a registration entity.
         // Setting $key to load a registration entity.
     }
     if ($key != null) { // not sure what to use here.
@@ -72,10 +71,7 @@ function reg_multi_page_callback($form, $registration_type) {
 function register_multiple_form_registration_form_alter(&$form, &$form_state, $form_id) {
     if ($form['#entity']->staff_registration == 'register_multiple') {
 
-        //$form['#registration_settings']->entity_id = 18741;
-        //$form['#entity']->entity_id = 18741;
-
-        // Load the related registraion entities and add them as check boxes.
+        // Load the related registration entities and add them as check boxes.
         $registration_entites = get_registration_entities();
         $index = 0;
         $checkbox_values = array();

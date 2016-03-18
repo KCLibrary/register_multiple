@@ -5,7 +5,10 @@ enabled events of a given registration type.
 
 # Installation #
 Enable the module and clear the cache to display pages.
-If you have a date field you will need to update your machine name field. "field_date_calendar"
-$date = $node->field_date_calendar['und'][0]['value'];
+
+If you have a date field you will need to update your machine name field.
+"field_date_calendar" $date = $node->field_date_calendar['und'][0]['value'];
+
+Or remove the date and just the $checkbox_values[$node->nid] = $node->title; to display the title.
 
 You can find the url to the multiple registration page at /register/LABEL-OF-YOUR-REGISTRATION-TYPE
